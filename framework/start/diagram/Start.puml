@@ -1,0 +1,83 @@
+@startuml
+
+actor User
+participant "org.ofbiz.base.start.\n<b>Start</b>" as start
+participant "org.ofbiz.base.start.\n<b>StartupLoader</b>" as startupLoader
+participant "org.ofbiz.base.start.Start.\n<b>AdminPortThread</b>" as adminPortThread
+participant "org.ofbiz.base.start.\n<b>Config</b>" as config
+participant "org.ofbiz.base.start.\n<b>Classpath</b>" as classpath
+
+note right of User
+ Through typing "ant start" or
+ "java -jar ofbiz.jar"
+ at command line to start OFBiz.
+end note
+User -> start : Start.main()
+activate start
+start -> start: new Start()
+activate start
+
+    start -> start: Start.init()
+group Init
+    activate start
+      start -> config: Config.getInstance()
+      activate config
+      config -> config: new
+      activate config
+      config -> start: Return instance of Config
+      deactivate config
+      /' initialize the classpath '/
+      start -> start: Start.initClasspath()
+      activate start
+      start -> config: Config.initClasspath()
+      activate config
+      config -> start
+      deactivate config
+      deactivate start
+
+      /' create the log directory '/
+      start -> start: Start.createLogDirectory()
+      activate start
+      deactivate start
+
+      /' create the listener thread '/
+      start -> start: Start.createListenerThread()
+      activate start
+      start -> adminPortThread: new
+      activate adminPortThread
+      start -> adminPortThread: AdminPortThread.start()
+      activate adminPortThread
+      deactivate start
+
+      /' initialize the startup loaders '/
+      start -> start: Start.initStartLoaders()
+      activate start
+        loop config.loaders
+          start -> startupLoader : new
+          activate startupLoader
+          start -> startupLoader : StartupLoader.load()
+          activate startupLoader
+          startupLoader -> start
+          deactivate startupLoader
+          note right of start
+            Create StartLoader instance,
+            put all loader instance into Start.loaders
+          end note
+
+        end
+      deactivate start
+end
+      deactivate start
+
+group Start Loaders
+    start -> start: Start.startStartLoaders()
+
+    activate start
+    loop Start.loaders
+      start -> startupLoader: startupLoader.start()
+      activate startupLoader
+    end
+    deactivate start
+end
+
+@enduml
