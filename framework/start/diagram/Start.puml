@@ -22,8 +22,62 @@ group Init
     activate start
       start -> config: Config.getInstance()
       activate config
-      config -> config: new
+      config -> config: Config.getConfigFileName()
       activate config
+      note right of config
+        Default config file - org/ofbiz/base/start/start.properties
+      end note
+      deactivate config
+      config -> config: new
+      config -> config: Config.readConfig()
+      activate config
+        config -> config: Check JDK version (At least 1.6).
+        config -> config: Config.getPropertiesFile()
+        activate config
+        deactivate config
+        config -> config: Setup OFBiz home.
+        note right of config
+          Setup OFBiz home at OFBiz project directory.
+          ofbiz.home = ./
+        end note
+        config -> config: Setup OFBiz all properties.
+        note right of config
+          ofbiz.base.config = ${ofbiz.home}/framework/base/config;
+          ofbiz.base.dtd = ${ofbiz.home}/framework/base/schema;
+          ofbiz.base.lib = ${ofbiz.home}/framework/base/lib;
+          ofbiz.base.jar = ${ofbiz.home}/framework/base/build/lib/ofbiz-base.jar;
+          Setup java tools.jar path if necessary;
+          Setup java comm.jar path, if necessary;
+          ofbiz.log.dir = ${ofbiz.home}/runtime/logs;
+          ofbiz.continar.config = ${ofbiz.home}/framework/base/config/ofbiz-containers.xml;
+          ofbiz.admin.host = 127.0.0.1;
+          ofbiz.admin.port = 0;
+          ofbiz.admin.key = NA;
+          derby.system.home = ${ofbiz.home}/runtime/data/derby;
+          log4j.configuration = log4j.xml;
+
+          ofbiz.enable.hook = true;
+          ofbiz.auto.shutdown = false;
+          java.awt.headless = true;
+          ofbiz.start.splash.logo = null;
+          org.mortbay.jetty.servlet.AbstractSessionManager.24SessionDestroyed = true;
+          user.language = ${ofbiz.locale.default}; - en
+          ofbiz.timeZone.default = System time zone.
+        end note
+
+        loop start.properties:ofbiz.start.loader...
+          note right of config
+            Default there is one loader stay in start.properties file,
+            that is org.ofbiz.base.container.ContainerLoader.
+          end note
+          config -> config: Put each loader into Config.loaders.
+        end loop
+        config ->o config
+      deactivate config
+
+
+
+
       config -> start: Return instance of Config
       deactivate config
       /' initialize the classpath '/
@@ -53,21 +107,41 @@ group Init
       start -> start: Start.initStartLoaders()
       activate start
         loop config.loaders
-          start -> startupLoader : new
-          activate startupLoader
+          start -> startupLoader : New instance of StartupLoader
+          create containerLoader
+          startupLoader -> containerLoader: New instance.
+          activate containerLoader
+          containerLoader --> start
           start -> startupLoader : StartupLoader.load()
-          activate startupLoader
-          startupLoader -> start
-          deactivate startupLoader
+          startupLoader -> containerLoader: org.ofbiz.base.container.ContainerLoader.load()
+          activate containerLoader
+          create containerConfig
+          containerLoader -> containerConfig: org.ofbiz.base.container.ContainerConfig.getContainers()
+          note left of containerConfig
+            List of register containers - ofbiz.continar.config:${ofbiz.home}/framework/base/config/ofbiz-containers.xml;
+              component-container - org.ofbiz.base.container.ComponentContainer
+              classloader-container - org.ofbiz.base.container.ClassLoaderContainer
+              naming-container - org.ofbiz.base.container.NamingServiceContainer
+              rmi-dispatcher - org.ofbiz.service.rmi.RmiServiceContainer
+              catalina-container - org.ofbiz.catalina.container.CatalinaContainer
+              birt-container - org.ofbiz.birt.container.BirtContainer
+          end note
+          containerConfig --> containerLoader
+
+
+
+          containerLoader --> start
+          deactivate containerLoader
           note right of start
             Create StartLoader instance,
             put all loader instance into Start.loaders
           end note
-
         end
+        start ->o start: End of initStartLoaders().
       deactivate start
 end
-      deactivate start
+start ->o start: End of init().
+deactivate start
 
 group Start Loaders
     start -> start: Start.startStartLoaders()
@@ -77,6 +151,7 @@ group Start Loaders
       start -> startupLoader: startupLoader.start()
       activate startupLoader
     end
+    start ->o start: End of startStartLoaders()
     deactivate start
 end
 
