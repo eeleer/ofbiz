@@ -1,11 +1,10 @@
 @startuml
+skinparam backgroundColor LightYellow
 
 actor User
 participant "org.ofbiz.base.start.\n<b>Start</b>" as start
-participant "org.ofbiz.base.start.\n<b>StartupLoader</b>" as startupLoader
-participant "org.ofbiz.base.start.Start.\n<b>AdminPortThread</b>" as adminPortThread
 participant "org.ofbiz.base.start.\n<b>Config</b>" as config
-participant "org.ofbiz.base.start.\n<b>Classpath</b>" as classpath
+participant "org.ofbiz.base.start.\n<b>StartupLoader</b>" as startupLoader
 
 note right of User
  Through typing "ant start" or
@@ -17,7 +16,7 @@ activate start
 start -> start: new Start()
 activate start
 
-    start -> start: Start.init()
+start -> start: Start.init()
 group Init
     activate start
       start -> config: Config.getInstance()
@@ -72,20 +71,20 @@ group Init
           end note
           config -> config: Put each loader into Config.loaders.
         end loop
-        config ->o config
+        config -->config
       deactivate config
 
 
 
 
-      config -> start: Return instance of Config
+      config --> start: Return instance of Config
       deactivate config
       /' initialize the classpath '/
       start -> start: Start.initClasspath()
       activate start
       start -> config: Config.initClasspath()
       activate config
-      config -> start
+      config --> start
       deactivate config
       deactivate start
 
@@ -97,6 +96,8 @@ group Init
       /' create the listener thread '/
       start -> start: Start.createListenerThread()
       activate start
+
+      create "org.ofbiz.base.start.Start.\n<b>AdminPortThread</b>" as adminPortThread
       start -> adminPortThread: new
       activate adminPortThread
       start -> adminPortThread: AdminPortThread.start()
@@ -107,15 +108,19 @@ group Init
       start -> start: Start.initStartLoaders()
       activate start
         loop config.loaders
-          start -> startupLoader : New instance of StartupLoader
-          create containerLoader
-          startupLoader -> containerLoader: New instance.
+          note right of start
+            Create StartLoader instance,
+            put all loader instance into Start.loaders
+          end note
+          start -> startupLoader : New instance
+          create "org.ofbiz.base.container.\n<b>ContainerLoader</b>" as containerLoader
+          startupLoader -> containerLoader: New instance: org.ofbiz.base.container.ContainerLoader..
           activate containerLoader
-          containerLoader --> start
+          containerLoader --> start: Instance of ContainerLoader.
           start -> startupLoader : StartupLoader.load()
-          startupLoader -> containerLoader: org.ofbiz.base.container.ContainerLoader.load()
+          startupLoader -> containerLoader: ContainerLoader.load()
           activate containerLoader
-          create containerConfig
+          create "org.ofbiz.base.container.\n<b>ContainerConfig</b>" as containerConfig
           containerLoader -> containerConfig: org.ofbiz.base.container.ContainerConfig.getContainers()
           note left of containerConfig
             List of register containers - ofbiz.continar.config:${ofbiz.home}/framework/base/config/ofbiz-containers.xml;
@@ -126,33 +131,40 @@ group Init
               catalina-container - org.ofbiz.catalina.container.CatalinaContainer
               birt-container - org.ofbiz.birt.container.BirtContainer
           end note
-          containerConfig --> containerLoader
-
-
+          containerConfig --> containerLoader: Collection of org.ofbiz.base.container.ContainerConfig.Container
+          note over containerLoader
+            After get all registered containers, OFBiz will create instance of those containers
+            and invoke it's init() method.
+          end note
 
           containerLoader --> start
           deactivate containerLoader
-          note right of start
-            Create StartLoader instance,
-            put all loader instance into Start.loaders
-          end note
         end
-        start ->o start: End of initStartLoaders().
+        start -->start: End of initStartLoaders().
       deactivate start
 end
-start ->o start: End of init().
+start -->start: End of init().
 deactivate start
 
-group Start Loaders
+group Start Container Loaders
     start -> start: Start.startStartLoaders()
 
     activate start
     loop Start.loaders
       start -> startupLoader: startupLoader.start()
-      activate startupLoader
+      startupLoader -> containerLoader: containerLoader.start()
+      activate containerLoader
+      note right containerLoader
+        All registered containers will startup, if any of them start failed,
+        whole start process failed.
+      end note
+      containerLoader --> startupLoader
+      deactivate containerLoader
+      startupLoader --> start
     end
-    start ->o start: End of startStartLoaders()
+    start -->start: End of startStartLoaders()
     deactivate start
 end
 
 @enduml
+
